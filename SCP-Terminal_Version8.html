@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>SCP Foundation - Secure Terminal</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    html, body {height: 100%; margin: 0; padding: 0; background: #101417; color: #c5c8c6; font-family: 'Consolas', 'Courier New', monospace; user-select: none;}
+    body {display: flex; justify-content: center; align-items: center; min-height: 100vh;}
+    .hidden {display:none !important;}
+    .glitch {animation: glitch 0.3s linear infinite;}
+    .blackout {box-shadow: 0 0 0 6px #c00 inset !important;}
+    @keyframes glitch {0%{text-shadow:2px 0 red,-2px 0 blue;}20%{text-shadow:-2px 0 red,2px 0 blue;}40%{text-shadow:2px 0 red,-2px 0 blue;}60%{text-shadow:-2px 0 red,2px 0 blue;}80%{text-shadow:2px 0 red,-2px 0 blue;}100%{text-shadow:0 0 0;}}
+    #login-screen {background: #11161a; border-radius: 10px; box-shadow: 0 0 40px #0c0c0c; padding: 40px 32px; min-width:340px; display:flex; flex-direction:column; align-items:center;}
+    #login-title {font-size:2em; letter-spacing:2px; margin-bottom:1em;}
+    .scp-logo {width: 64px; margin-bottom: 16px;}
+    .login-input {background:#222;color:#fff;border:none;border-radius:3px;padding:8px 12px;margin:8px 0;width:220px;}
+    .login-btn {background:#c00;border:none;color:#fff;padding:10px 30px;margin-top:18px;border-radius:4px;font-weight:bold;cursor:pointer;letter-spacing:1px;}
+    .login-btn:active {background:#900;}
+    .login-error {color:#ff4444; margin-top: 8px;}
+    #loading-screen {background:rgba(0,0,0,0.98);position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:200;}
+    .loading-terminal {background:#15181b;color:#0f0;padding:32px;border-radius:8px;font-size:1.2em;box-shadow:0 0 32px #000;}
+    .blink {animation: blink 0.8s steps(1) infinite;}
+    @keyframes blink {50%{opacity:0;}}
+    #desktop {
+      width:100vw; height:100vh;
+      background:
+        repeating-linear-gradient(0deg, #14181e 10px, #090b0f 100px),
+        url('data:image/svg+xml;utf8,<svg viewBox="0 0 320 320" width="320" height="320" fill="none" xmlns="http://www.w3.org/2000/svg"><g opacity="0.08"><circle cx="160" cy="160" r="150" stroke="white" stroke-width="24"/><path d="M160 60 L200 160 L160 260 L120 160 Z" fill="white"/></g></svg>') repeat center center fixed;
+      background-size: 420px 420px, 320px 320px;
+      position:relative;
+      user-select: none;
+    }
+    .desktop-logo-bg {
+      position:fixed;
+      left:50%;top:50%;
+      transform:translate(-50%,-50%);
+      width:540px;height:540px;
+      z-index:0;opacity:0.08;
+      user-select:none;pointer-events:none;
+    }
+    .taskbar {position:fixed;bottom:0;left:0;width:100vw;height:40px;background:#191c22;border-top:2px solid #20242a;display:flex;padding:0 10px;z-index:99;}
+    .taskbar-btn {margin-right:16px;cursor:pointer;padding:0 10px;line-height:40px;color:#c5c8c6;}
+    .taskbar-btn:hover {background:#272b32;}
+    .scptitle {padding:24px 0 8px 24px;font-size:1.5em;letter-spacing:1px;position:relative;z-index:2;}
+    .window {position:absolute;top:70px;left:80px;width:560px;min-height:340px;background:#181d23;border-radius:6px;box-shadow:0 0 40px #0009;z-index:10;display:flex;flex-direction:column;user-select:none;}
+    .window-header {background:#20252e;color:#fff;font-weight:bold;padding:8px 16px;cursor:move;border-radius:6px 6px 0 0;user-select:none;display:flex;justify-content:space-between;}
+    .window-close {cursor:pointer;color:#f44;font-weight:bold;}
+    .window-content {flex:1;padding:18px 20px;overflow:auto;}
+    #terminal-output {height: 220px; overflow-y: auto; background:#1e2228;padding:10px;color:#8fe77b;font-size:1em;border-radius:4px;}
+    #terminal-input {width: 100%; background: #23272e; color:#aff;border:none;padding:7px 10px;margin-top:10px;border-radius:3px;}
+    .scp-list {max-height: 270px; overflow-y: auto;}
+    .scp-entry {background:#23272e;border-left:4px solid #3e8c3a;margin:8px 0;padding:9px 12px;border-radius:3px;cursor:pointer;}
+    .scp-entry:hover {background:#2e343b;}
+    .camera-feed {width:320px;height:180px;background:#000;position:relative;overflow:hidden;border:2px solid #484;}
+    .vhs {width:100%;height:100%;object-fit:cover;filter:contrast(1.1) blur(1px) grayscale(0.5);}
+    .camera-overlay {position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;}
+    .camera-timestamp {position:absolute;bottom:4px;right:12px;color:#fff;font-size:0.9em;text-shadow:0 0 4px #000;}
+    #notes-area {width:100%;height:150px;background:#1a2127;color:#fff;border:none;padding:8px;border-radius:3px;}
+    #notes-save {margin-top:10px;background:#48a;color:#fff;border:none;padding:7px 24px;border-radius:3px;cursor:pointer;}
+    .chat-window {height:210px;overflow-y:auto;background:#13171c;padding:10px;border-radius:4px;}
+    .chat-msg {margin-bottom:10px;}
+    .chat-user {font-weight:bold;color:#8cf;}
+    .chat-bot {color:#d9d;}
+    .chat-input {width:80%;background:#1f2327;color:#fff;border:none;padding:7px 10px;margin-top:10px;border-radius:3px;}
+    .chat-send {background:#2e7;border:none;padding:7px 20px;color:#222;border-radius:3px;cursor:pointer;}
+    .file-list {list-style:none;padding:0;}
+    .file-item {padding:6px 0;cursor:pointer;color:#8ba;border-bottom:1px solid #223;}
+    .file-item:hover {background:#21292f;}
+    .modal-bg {position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:300;display:flex;justify-content:center;align-items:center;}
+    .modal {background:#23272e;color:#fff;padding:32px 28px;border-radius:8px;max-width:420px;text-align:center;}
+    .modal-btn {margin-top:20px;background:#c00;color:#fff;padding:10px 30px;border:none;border-radius:4px;font-weight:bold;cursor:pointer;}
+    .alarm {color:#fff;background:#c00;animation: alarmflash 0.6s alternate infinite;}
+    @keyframes alarmflash {0%{background:#c00;}100%{background:#400;}}
+    #fullscreen-hint {position:fixed;top:10px;right:20px;z-index:1000;color:#fff;background:#111a;border-radius:8px;padding:8px 20px;box-shadow:0 0 8px #000b;font-size:1em;}
+    #fullscreen-hint button {background:#222;color:#fff;border:none;padding:7px 18px;font-weight:bold;border-radius:4px;cursor:pointer;}
+    #fullscreen-hint button:active {background:#333;}
+    #profile-window {position:absolute;top:120px;left:320px;width:330px;z-index:9999;}
+    #profile-content {background:#282d36;padding:24px;border-radius:12px;color:#fff;text-align:left;box-shadow:0 0 36px #000b;}
+    .profile-badge {background:#448;border-radius:8px;padding:4px 14px;color:#fff;margin-right:8px;font-size:0.98em;}
+    .profile-badge.o5 {background:#c00;}
+    #taskbar-clock {margin-left:auto;color:#8fe77b;font-family:inherit;min-width:160px;text-align:right;padding-right:12px;}
+    /* Fenster und Taskbar Nicht markierbar */
+    .taskbar, .window, .window-header, .window-content {user-select: none;}
+  </style>
+</head>
+<body>
+<!-- LOGIN -->
+<div id="login-screen">
+  <img class="scp-logo" src="data:image/svg+xml;utf8,<svg width='64' height='64' viewBox='0 0 64 64' fill='none' xmlns='http://www.w3.org/2000/svg'><circle cx='32' cy='32' r='30' stroke='white' stroke-width='4'/><path d='M32 14 L38 32 L32 50 L26 32 Z' fill='white'/></svg>">
+  <div id="login-title">SCP Foundation Secure Access</div>
+  <input id="login-user" class="login-input" placeholder="Benutzername" autocomplete="off">
+  <input id="login-pass" class="login-input" type="password" placeholder="Passwort" autocomplete="off">
+  <button class="login-btn" id="login-btn">Anmelden</button>
+  <div class="login-error" id="login-error"></div>
+</div>
+<div id="fullscreen-hint" class="hidden">Vollbild empfohlen! <button onclick="requestFullscreen()">Jetzt aktivieren</button></div>
+<!-- LOADING SCREEN -->
+<div id="loading-screen" class="hidden">
+  <div class="loading-terminal">
+    <span id="loading-text">Authentifiziere...<span class="blink">|</span></span>
+  </div>
+</div>
+<!-- DESKTOP -->
+<div id="desktop" class="hidden">
+  <div class="desktop-logo-bg">
+    <img src="data:image/svg+xml;utf8,<svg viewBox='0 0 320 320' width='320' height='320' fill='none' xmlns='http://www.w3.org/2000/svg'><g opacity='0.12'><circle cx='160' cy='160' r='150' stroke='white' stroke-width='24'/><path d='M160 60 L200 160 L160 260 L120 160 Z' fill='white'/></g></svg>" width="100%" height="100%">
+  </div>
+  <div class="scptitle">SCP Foundation - Secure Terminal Desktop</div>
+  <div class="taskbar">
+    <div id="scp-start-btn" class="taskbar-btn" style="position:relative;">
+      <img src="data:image/svg+xml;utf8,<svg width='36' height='36' viewBox='0 0 64 64' fill='none' xmlns='http://www.w3.org/2000/svg'><circle cx='32' cy='32' r='30' stroke='white' stroke-width='4'/><path d='M32 14 L38 32 L32 50 L26 32 Z' fill='white'/></svg>" style="vertical-align:middle;">
+    </div>
+    <div class="taskbar-btn" onclick="openWindow('terminal')">Terminal</div>
+    <div class="taskbar-btn" onclick="openWindow('database')">SCP-Datenbank</div>
+    <div class="taskbar-btn" onclick="openWindow('camera')">Kamera</div>
+    <div class="taskbar-btn" onclick="openWindow('notes')">Notizen</div>
+    <div class="taskbar-btn" onclick="openWindow('chat')">Chat</div>
+    <div class="taskbar-btn" onclick="openWindow('explorer')">Datei-Explorer</div>
+    <div class="taskbar-btn" onclick="openWindow('updates')">Updates</div>
+    <div class="taskbar-btn" onclick="openWindow('worldchat')">World-Chat</div>
+    <div class="taskbar-btn" onclick="showProfile()">Profil</div>
+    <div id="taskbar-clock"></div>
+  </div>
+  <div id="scp-start-menu" class="hidden" style="position:fixed;bottom:44px;left:10px;background:#181d23;border-radius:10px;box-shadow:0 0 24px #000b;padding:18px 28px;z-index:200;min-width:220px;">
+    <div style="font-weight:bold;color:#fff;margin-bottom:10px;">SCP Anwendungen</div>
+    <div id="scp-app-list"></div>
+  </div>
+</div>
+<div id="modal-overlay" class="hidden"></div>
+<!-- FENSTER-TEMPLATES -->
+<template id="tpl-terminal"><div class="window" style="top:80px;left:140px;min-width:380px;width:510px"><div class="window-header"><span>Terminal-Konsole</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><div id="terminal-output"></div><input id="terminal-input" autocomplete="off" placeholder="Befehl eingeben..."></div></div></template>
+<template id="tpl-database"><div class="window" style="top:140px;left:240px;width:520px"><div class="window-header"><span>SCP-Datenbank</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content scp-list" id="scp-list"></div><div style="margin-top:10px;"><input id="search-scp" style="padding:6px;width:170px;" placeholder="SCP suchen/Nummer"><button onclick="searchSCPBtn()" style="padding:6px 14px;">Suche</button><button onclick="randomSCP()" style="padding:6px 14px;">Zufalls-SCP</button><button onclick="addSCPBtn()" style="padding:6px 14px;">SCP hinzufügen</button></div></div></template>
+<template id="tpl-camera"><div class="window" style="top:200px;left:320px;width:380px"><div class="window-header"><span>Kamera-Überwachung</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><div class="camera-feed"><img class="vhs" id="camera-gif" src="" alt="SCP Cam"><div class="camera-overlay"></div><div class="camera-timestamp"></div></div><button onclick="nextCameraFeed()" style="margin-top:16px;">Kamera wechseln</button></div></div></template>
+<template id="tpl-notes"><div class="window" style="top:120px;left:560px;width:400px"><div class="window-header"><span>Notizbuch</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><textarea id="notes-area" placeholder="Notiz eingeben..."></textarea><button id="notes-save">Speichern</button><div id="notes-status" style="margin-top:10px;color:#6f6;"></div></div></div></template>
+<template id="tpl-chat"><div class="window" style="top:200px;left:520px;width:380px"><div class="window-header"><span>Chat</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><div class="chat-window" id="chat-window"></div><input class="chat-input" id="chat-input" autocomplete="off" placeholder="Nachricht..."><button class="chat-send" onclick="sendChat()">Senden</button></div></div></template>
+<template id="tpl-explorer"><div class="window" style="top:80px;left:700px;width:360px"><div class="window-header"><span>Datei-Explorer</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><ul class="file-list" id="file-list"></ul><div id="file-viewer" style="margin-top:14px;"></div></div></div></template>
+<template id="tpl-updates"><div class="window" style="top:180px;left:420px;width:390px"><div class="window-header"><span>Update-Zentrale</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><b>Verfügbare Updates:</b><br><br><button onclick="runUpdate('scp')" style="background:#18a;padding:10px 22px;margin-bottom:12px;">SCP-Update</button> <br><span style="font-size:0.95em;color:#aaa;">Behebt Terminalfehler, setzt System zurück</span><br><br><button onclick="runUpdate('loop')" style="background:#555;padding:10px 22px;margin-bottom:12px;">Loop-Update</button> <br><span style="font-size:0.95em;color:#aaa;">Zeigt Netzwerkstreams, blockiert Eingaben außer 'c'</span><br><br><button onclick="runUpdate('blackout')" style="background:#900;color:#fff;padding:10px 22px;margin-bottom:12px;">Blackout-Update</button> <br><span style="font-size:0.95em;color:#aaa;">Simuliert Stromausfall und Systemreboot</span></div></div></template>
+<template id="tpl-worldchat"><div class="window" style="top:220px;left:440px;width:420px"><div class="window-header"><span>World-Chat</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><div class="chat-window" id="worldchat-window" style="height:180px;"></div><input class="chat-input" id="worldchat-input" autocomplete="off" placeholder="Nachricht..."><button class="chat-send" id="worldchat-send">Senden</button></div></div></template>
+
+<!-- 15 zusätzliche Apps -->
+<template id="tpl-browser"><div class="window" style="top:100px;left:120px;width:700px;height:520px;"><div class="window-header"><span>Browser</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><input id="browser-url" style="width:70%;padding:4px;" placeholder="https://www.wikipedia.org"><button onclick="loadBrowserUrl()" style="padding:4px;">Go</button><br><iframe id="browser-frame" src="https://www.wikipedia.org" style="width:99%;height:400px;margin-top:8px;border-radius:6px;border:none;background:#fff;"></iframe></div></div></template>
+<template id="tpl-txtfile"><div class="window" style="top:100px;left:360px;width:480px;"><div class="window-header"><span>SCP-Foundation512.txt</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><pre id="scp512info"></pre></div></div></template>
+<template id="tpl-music"><div class="window" style="top:200px;left:900px;width:350px;"><div class="window-header"><span>Musikplayer</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><audio controls loop style="width:100%"><source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mp3"></audio></div></div></template>
+<template id="tpl-calendar"><div class="window" style="top:160px;left:820px;width:300px;"><div class="window-header"><span>Kalender</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><div id="calendar"></div></div></div></template>
+<template id="tpl-weather"><div class="window" style="top:50px;left:900px;width:300px;"><div class="window-header"><span>Wetter</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><div id="weather-info"></div></div></div></template>
+<template id="tpl-newsfeed"><div class="window" style="top:300px;left:800px;width:350px;"><div class="window-header"><span>SCP-Newsfeed</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><ul id="newsfeed-list"></ul></div></div></template>
+<template id="tpl-terminallog"><div class="window" style="top:340px;left:360px;width:420px;"><div class="window-header"><span>Terminal-Protokolle</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><pre id="terminal-logs"></pre></div></div></template>
+<template id="tpl-scpviewer"><div class="window" style="top:360px;left:120px;width:420px;"><div class="window-header"><span>SCP-Viewer</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><div id="scp-viewer"></div></div></div></template>
+<template id="tpl-scpgen"><div class="window" style="top:120px;left:1000px;width:320px;"><div class="window-header"><span>SCP-Generator</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><button onclick="generateSCP()">Neues SCP generieren</button><div id="scp-gen-result"></div></div></div></template>
+<template id="tpl-minigame"><div class="window" style="top:400px;left:1200px;width:260px;"><div class="window-header"><span>Mini-Game</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><button id="game-btn">Punkt!</button><div id="game-score">Score: 0</div></div></div></template>
+<template id="tpl-calc"><div class="window" style="top:80px;left:1100px;width:220px;"><div class="window-header"><span>Taschenrechner</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><input id="calc-inp" style="width:80px;" placeholder="2+2"><button onclick="calcEval()">=</button><span id="calc-res"></span></div></div></template>
+<template id="tpl-timer"><div class="window" style="top:480px;left:1100px;width:220px;"><div class="window-header"><span>Timer</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><input id="timer-secs" type="number" min="1" max="999" style="width:70px;" placeholder="Sekunden"><button onclick="startTimer()">Start</button><div id="timer-count"></div></div></div></template>
+<template id="tpl-image"><div class="window" style="top:400px;left:800px;width:320px;"><div class="window-header"><span>Bildbetrachter</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/SCP_Foundation_logo.svg/1200px-SCP_Foundation_logo.svg.png" style="width:98%;border-radius:8px;"></div></div></template>
+<template id="tpl-code"><div class="window" style="top:60px;left:1300px;width:330px;"><div class="window-header"><span>Code-Editor</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><textarea id="code-editor" style="width:98%;height:120px;"></textarea><button onclick="saveCode()">Speichern</button><div id="code-status"></div></div></div></template>
+<template id="tpl-layout"><div class="window" style="top:500px;left:1400px;width:340px;"><div class="window-header"><span>Layout-Designer</span><span class="window-close" onclick="closeWindow(this)">✕</span></div><div class="window-content"><div id="layout-area">Ziehe Fenster zum Testen!</div></div></div></template>
+
+<!-- PROFILE & MODAL -->
+<div id="profile-window" class="hidden"><div id="profile-content"></div></div>
+<div id="profile-edit-modal" class="hidden" style="position:fixed;top:20%;left:50%;transform:translateX(-50%);background:#23272e;color:#fff;padding:30px;border-radius:10px;box-shadow:0 0 18px #000b;z-index:9999;"><div style="margin-bottom:10px;font-weight:bold;">Profil bearbeiten</div><label>Neuer Name: <input id="profile-edit-name" style="padding:6px;width:180px;"></label><button onclick="saveProfileEdit()" style="margin:12px 8px 0 0;padding:7px 24px;border-radius:4px;background:#48a;color:#fff;">Speichern</button><button onclick="closeProfileEdit()" style="margin-top:12px;padding:7px 24px;border-radius:4px;background:#c00;color:#fff;">Abbrechen</button></div>
+<script>
+// Vollbild nach Login
+function requestFullscreen(){
+  let docElm = document.documentElement;
+  if (docElm.requestFullscreen) docElm.requestFullscreen();
+  else if (docElm.mozRequestFullScreen) docElm.mozRequestFullScreen();
+  else if (docElm.webkitRequestFullScreen) docElm.webkitRequestFullScreen();
+  else if (docElm.msRequestFullscreen) docElm.msRequestFullscreen();
+}
+const clickSound = new Audio("data:audio/wav;base64,UklGRkQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YYAAAD///8AAAB/f3///////wAAAP///wAAAH9/f39/f38AAAAAAAD//w==");
+function playClick() { clickSound.currentTime = 0; clickSound.play(); }
+const loginScreen = document.getElementById('login-screen');
+const loadingScreen = document.getElementById('loading-screen');
+const desktop = document.getElementById('desktop');
+const loginBtn = document.getElementById('login-btn');
+const loginUser = document.getElementById('login-user');
+const loginPass = document.getElementById('login-pass');
+const loginError = document.getElementById('login-error');
+const fullscreenHint = document.getElementById('fullscreen-hint');
+let clearanceLevel = 1;
+let userName = "";
+// World-Chat: LocalStorage als Simulation für globalen Chat
+function getWorldChat(){
+  return JSON.parse(localStorage.getItem('scpWorldChat')||'[]');
+}
+function setWorldChat(arr){
+  localStorage.setItem('scpWorldChat',JSON.stringify(arr));
+}
+loginBtn.onclick = function() {
+  if (loginPass.value === "90105" || loginPass.value === "2587") {
+    clearanceLevel = (loginPass.value === "2587") ? 5 : 3;
+    proceedLogin();
+  } else {
+    loginError.textContent = "Falsches Passwort!";
+    playClick();
+  }
+};
+function proceedLogin() {
+  loginError.textContent = "";
+  playClick();
+  loginScreen.classList.add('hidden');
+  fullscreenHint.classList.add('hidden');
+  loadingScreen.classList.remove('hidden');
+  startLoading();
+  setTimeout(requestFullscreen, 400);
+}
+/* Loading */
+function startLoading(){
+  let step = 0;
+  const loadingText = document.getElementById('loading-text');
+  const loadingSteps = [
+    "Zugriff auf Foundation-Intranet...",
+    "Überprüfung der Clearance...",
+    "Lade SCP-Datenbank...",
+    "Initialisiere Module...",
+    "Systemstart abgeschlossen."
+  ];
+  const interval = setInterval(() => {
+    if(step < loadingSteps.length) {
+      loadingText.innerHTML = loadingSteps[step] + "<span class='blink'>|</span>";
+      playClick();
+      step++;
+    } else {
+      clearInterval(interval);
+      setTimeout(()=>{
+        loadingScreen.classList.add('hidden');
+        showDesktop();
+      }, 700);
+    }
+  }, 1050);
+}
+function showDesktop() {
+  desktop.classList.remove('hidden');
+  openWindow('terminal');
+}
+/* Uhr */
+function updateClock(){
+  let d = new Date();
+  let h = d.getHours().toString().padStart(2,"0");
+  let m = d.getMinutes().toString().padStart(2,"0");
+  let s = d.getSeconds().toString().padStart(2,"0");
+  let date = d.toLocaleDateString();
+  document.getElementById('taskbar-clock').textContent = `${h}:${m}:${s}  ${date}`;
+}
+setInterval(updateClock, 1000);
+/* Startmenü */
+const SCP_APPS = [
+  {key:"terminal", label:"Terminal", icon:"💻"},
+  {key:"database", label:"SCP-Datenbank", icon:"📚"},
+  {key:"camera", label:"Kamera", icon:"📷"},
+  {key:"notes", label:"Notizen", icon:"📝"},
+  {key:"chat", label:"Chat", icon:"💬"},
+  {key:"explorer", label:"Datei-Explorer", icon:"🗂️"},
+  {key:"updates", label:"Updates", icon:"🔄"},
+  {key:"worldchat", label:"World-Chat", icon:"🌐"},
+  {key:"browser", label:"Browser", icon:"🌍"},
+  {key:"txtfile", label:"SCP-Foundation512.txt", icon:"📄"},
+  {key:"music", label:"Musikplayer", icon:"🎵"},
+  {key:"calendar", label:"Kalender", icon:"📅"},
+  {key:"weather", label:"Wetter", icon:"⛅"},
+  {key:"newsfeed", label:"SCP-Newsfeed", icon:"📰"},
+  {key:"terminallog", label:"Terminal-Protokolle", icon:"📑"},
+  {key:"scpviewer", label:"SCP-Viewer", icon:"👁️"},
+  {key:"scpgen", label:"SCP-Generator", icon:"⚛️"},
+  {key:"minigame", label:"Mini-Game", icon:"🎮"},
+  {key:"calc", label:"Taschenrechner", icon:"🧮"},
+  {key:"timer", label:"Timer", icon:"⏲️"},
+  {key:"image", label:"Bildbetrachter", icon:"🖼️"},
+  {key:"code", label:"Code-Editor", icon:"📝"},
+  {key:"layout", label:"Layout-Designer", icon:"🖥️"},
+  {key:"quiz", label:"SCP-Quiz", icon:"❓"},
+  {key:"news", label:"SCP-News", icon:"📰"},
+  {key:"archiv", label:"SCP-Archiv", icon:"🗄️"},
+  {key:"containment", label:"Containment-Status", icon:"🚨"},
+  {key:"profile", label:"Profil", icon:"🧑‍💼"},
+];
+let scpMenuOpen = false;
+document.getElementById('scp-start-btn').onclick = function(e){
+  playClick();
+  const menu = document.getElementById('scp-start-menu');
+  if(!scpMenuOpen){
+    showSCPMenu();
+    scpMenuOpen = true;
+  } else {
+    menu.classList.add('hidden');
+    scpMenuOpen = false;
+  }
+};
+document.getElementById('scp-start-btn').ondblclick = function(e){
+  playClick();
+  showSCPMenu();
+};
+function showSCPMenu(){
+  const menu = document.getElementById('scp-start-menu');
+  const list = document.getElementById('scp-app-list');
+  list.innerHTML = "";
+  SCP_APPS.forEach(app=>{
+    let div = document.createElement('div');
+    div.className = "scp-app-entry";
+    div.style = "cursor:pointer;padding:7px 0;font-size:1em;";
+    div.innerHTML = `<span style="font-size:1.3em">${app.icon}</span> <span>${app.label}</span>`;
+    div.ondblclick = ()=>{menu.classList.add('hidden'); scpMenuOpen=false; (app.key=="profile"?showProfile():openWindow(app.key));};
+    div.onclick = ()=>{playClick();};
+    list.appendChild(div);
+  });
+  menu.classList.remove('hidden');
+}
+/* Fensterverwaltung, Drag */
+let openWindows = {};
+function openWindow(type) {
+  playClick();
+  if(openWindows[type]) {
+    openWindows[type].style.zIndex = Object.keys(openWindows).length + 10;
+    return;
+  }
+  let tpl = document.getElementById(`tpl-${type}`);
+  if (!tpl) return;
+  let wnd = tpl.content.firstElementChild.cloneNode(true);
+  desktop.appendChild(wnd);
+  wnd.querySelector('.window-header').onmousedown = function(e){
+    let x = e.clientX, y = e.clientY, startLeft = wnd.offsetLeft, startTop = wnd.offsetTop;
+    function move(ev){
+      wnd.style.left = (startLeft + ev.clientX - x) + "px";
+      wnd.style.top  = (startTop  + ev.clientY - y) + "px";
+    }
+    function up(){document.removeEventListener('mousemove',move);document.removeEventListener('mouseup',up);}
+    document.addEventListener('mousemove',move);
+    document.addEventListener('mouseup',up);
+  };
+  openWindows[type]=wnd;
+  switch(type) {
+    case 'terminal': initTerminal(wnd); break;
+    case 'database': initDatabase(wnd); break;
+    case 'camera':   initCamera(wnd); break;
+    case 'notes':    initNotes(wnd); break;
+    case 'chat':     initChat(wnd); break;
+    case 'explorer': initExplorer(wnd); break;
+    case 'updates':  initUpdates(wnd); break;
+    case 'worldchat':initWorldChat(wnd); break;
+    case 'browser':  initBrowser(wnd); break;
+    case 'txtfile':  initTxtFile(wnd); break;
+    case 'music':    break;
+    case 'calendar': initCalendar(wnd); break;
+    case 'weather':  initWeather(wnd); break;
+    case 'newsfeed': initNewsFeed(wnd); break;
+    case 'terminallog':initTerminalLog(wnd); break;
+    case 'scpviewer':initSCPViewer(wnd); break;
+    case 'scpgen':   break;
+    case 'minigame': initMiniGame(wnd); break;
+    case 'calc':     break;
+    case 'timer':    break;
+    case 'image':    break;
+    case 'code':     break;
+    case 'layout':   break;
+    case 'quiz':     initQuiz(wnd); break;
+    case 'news':     break;
+    case 'archiv':   initArchiv(wnd); break;
+    case 'containment': initContainment(wnd); break;
+    case 'profile':  showProfile(); wnd.remove(); break;
+  }
+}
+function closeWindow(btn){
+  playClick();
+  let wnd = btn.closest('.window');
+  for(let k in openWindows) if(openWindows[k]===wnd) delete openWindows[k];
+  wnd.remove();
+}
+/* Terminal */
+function initTerminal(wnd){
+  const termOut = wnd.querySelector('#terminal-output');
+  const termIn  = wnd.querySelector('#terminal-input');
+  let history = [];
+  let histPos = 0;
+  function log(line){ termOut.innerHTML += `<div>> ${line}</div>`; termOut.scrollTop=99999;}
+  function process(cmd){
+    history.push(cmd); histPos = history.length;
+    if(cmd==="help") log("Apps: " + SCP_APPS.map(a=>a.label).join(', '));
+    else if(cmd==="date") log("Systemzeit: "+(new Date()).toLocaleString());
+    else if(cmd==="random") log("Würfelergebnis: " + (1+Math.floor(Math.random()*100)));
+    else if(SCP_APPS.some(app=>app.key===cmd)) { openWindow(cmd); log(cmd+" geöffnet."); }
+    else log("Unbekannter Befehl. (help für Apps)");
+  }
+  termIn.onkeydown=function(e){
+    if(e.key==="Enter"){ let v=termIn.value.trim(); if(v){ log(v); process(v); termIn.value="";} }
+    else if(e.key==="ArrowUp"){ if(histPos>0) histPos--; termIn.value=history[histPos]||""; }
+    else if(e.key==="ArrowDown"){ if(histPos<history.length-1) histPos++; termIn.value=history[histPos]||""; }
+  };
+  log("Terminal bereit. (help für Apps)");
+}
+/* World-Chat */
+function initWorldChat(wnd){
+  const win = wnd.querySelector('#worldchat-window');
+  const inp = wnd.querySelector('#worldchat-input');
+  const send = wnd.querySelector('#worldchat-send');
+  function render() {
+    win.innerHTML = "";
+    getWorldChat().forEach(m=>{
+      win.innerHTML += `<div class="chat-msg"><span class="chat-user">${m.name}:</span> <span>${m.msg}</span></div>`;
+    });
+    win.scrollTop=99999;
+  }
+  render();
+  send.onclick = function(){
+    let val = inp.value.trim();
+    if(val){
+      let name = userName||loginUser.value||"Unbekannt";
+      let arr = getWorldChat();
+      arr.push({name, msg:val});
+      setWorldChat(arr);
+      inp.value="";
+      render();
+    }
+  };
+  inp.onkeydown=function(e){if(e.key==="Enter")send.onclick();};
+  setInterval(render, 2500); // "live" update
+}
+/* Browser */
+function initBrowser(wnd){
+  wnd.querySelector("#browser-url").onkeydown = function(e){
+    if(e.key==="Enter") loadBrowserUrl();
+  };
+}
+function loadBrowserUrl(){
+  let url = document.getElementById("browser-url").value;
+  if(!/^https?:\/\//.test(url)) url="https://"+url;
+  document.getElementById("browser-frame").src = url;
+}
+/* TxtFile */
+function initTxtFile(wnd){
+  wnd.querySelector("#scp512info").textContent =
+`SCP-Foundation512.txt
+
+Informationsprotokoll:
+
+SCP Foundation 512 ist eine Organisation, die sich auf die Erforschung, Sicherung und das Containment anomaler Objekte und Phänomene spezialisiert hat. 
+
+Owner: █████ █████
+Bekannt auf TikTok unter: SCP.Foundation512
+Rang: O5-Mitglied, Sicherheitsbeamter
+Standort: Deutschland
+Aktuelle Leitung: █████ (Terminal-Admin)
+Führt Projekte in Kategorien: Forschung, Sicherheit, Innovation, Kommunikation, Netzwerkmanagement, KI-Integration, Medien.
+Spezialgebiete: Hochsicherheitsprotokolle, Terminaldesign, Überwachungssysteme, Kommunikation und Live-Events.
+
+Besondere Aktivitäten:
+- Terminal-Entwicklung und -Leitung
+- SCP-Projektkoordination
+- Netzwerkadministration
+- Community-Management
+
+Kontakt: Nur über interne Kanäle.
+
+Hinweis: Informationen sind vertraulich.
+`;
+}
+/* Kalender */
+function initCalendar(wnd){
+  let d = new Date();
+  wnd.querySelector("#calendar").innerHTML = `<b>${d.toLocaleString()}</b><br>Heute ist ${["Sonntag","Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag"][d.getDay()]}`;
+}
+/* Wetter (Demo statisch) */
+function initWeather(wnd){
+  wnd.querySelector("#weather-info").innerHTML = `<b>Aktuelles Wetter:</b><br>
+  Standort: Deutschland<br>
+  Temperatur: 23°C<br>
+  Luftfeuchte: 67%<br>
+  Bewölkung: Leicht bewölkt<br>
+  Wind: 9 km/h`;
+}
+/* Newsfeed (Demo statisch) */
+function initNewsFeed(wnd){
+  wnd.querySelector("#newsfeed-list").innerHTML = `
+    <li>SCP-682: Forschungsteam berichtet Durchbruch bei Zellregeneration.</li>
+    <li>SCP-173: Überwachungssystem aktualisiert.</li>
+    <li>SCP-Foundation512: Neue Projekte in Planung.</li>
+    <li>Netzwerkstatus: Alle Systeme stabil.</li>
+  `;
+}
+/* Terminal-Protokolle (Demo statisch) */
+function initTerminalLog(wnd){
+  wnd.querySelector("#terminal-logs").textContent = `Terminal-Protokoll:
+[10:11] Login erfolgreich.
+[10:12] SCP-173 geöffnet.
+[10:14] Kamera-Überwachung gestartet.
+[10:15] World-Chat geöffnet.
+[10:16] Neue SCP-Foundation512.txt gelesen.
+[10:17] Sicherheitsupdate ausgeführt.
+[10:19] Netzwerkstatus geprüft.`;
+}
+/* SCP Viewer (Demo statisch) */
+function initSCPViewer(wnd){
+  wnd.querySelector("#scp-viewer").innerHTML = `
+    <b>SCP-173:</b> Statue, extrem gefährlich.<br>
+    <b>SCP-682:</b> Unzerstörbares Reptil.<br>
+    <b>SCP-Foundation512:</b> Leitung durch █████. Projekte: Terminal, Sicherheit, Innovation.
+  `;
+}
+/* Mini-Game */
+function initMiniGame(wnd){
+  let score = 0;
+  const btn = wnd.querySelector("#game-btn");
+  const sc = wnd.querySelector("#game-score");
+  btn.onclick = function(){score++;sc.textContent="Score: "+score;playClick();};
+}
+/* Drag/Select verhindern */
+document.addEventListener('selectstart', function(e) {
+  // Doppelklick markiert nichts
+  if(e.target.closest('.window') || e.target.closest('.taskbar')) e.preventDefault();
+});
+/* PROFIL */
+function showProfile(){
+  let pw = document.getElementById("profile-window");
+  let pc = document.getElementById("profile-content");
+  pw.classList.remove("hidden");
+  pc.innerHTML = `<h2>Mitarbeiterprofil</h2>
+    <div><b>Nutzer:</b> <span id="profile-name">${userName||loginUser.value||"Unbekannt"}</span></div>
+    <div><b>Clearance-Level:</b> 3 <span class='profile-badge'>Secure</span></div>
+    <div><b>Badges:</b> <span class='profile-badge'>Secure</span></div>
+    <div><b>Missionen:</b> Überprüfe SCP-173, Berichte an O5.</div>
+    <button class='modal-btn' onclick='showProfileEdit()'>Bearbeiten</button>
+    <button class='modal-btn' onclick='hideProfile()' style='margin-left:10px;'>Schließen</button>`;
+}
+function showProfileEdit(){
+  let modal = document.getElementById("profile-edit-modal");
+  let inp = document.getElementById("profile-edit-name");
+  inp.value = userName||loginUser.value||"Unbekannt";
+  modal.classList.remove("hidden");
+}
+function saveProfileEdit(){
+  let inp = document.getElementById("profile-edit-name");
+  userName = inp.value.trim();
+  document.getElementById("profile-edit-modal").classList.add("hidden");
+  showProfile();
+}
+function closeProfileEdit(){
+  document.getElementById("profile-edit-modal").classList.add("hidden");
+}
+function hideProfile(){
+  document.getElementById("profile-window").classList.add("hidden");
+}
+/* INIT */
+window.onload = ()=>{ loginUser.focus(); updateClock(); };
+</script>
+</body>
+</html>
